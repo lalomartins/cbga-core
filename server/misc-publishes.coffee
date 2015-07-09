@@ -1,3 +1,4 @@
+# this doesn't really belong here, but I don't know where else yet :-)
 CBGA.setupCollections()
 
 # temporary publishes for development

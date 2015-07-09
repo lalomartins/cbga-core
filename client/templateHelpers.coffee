@@ -1,3 +1,4 @@
+# for Jade convenience
 Template.registerHelper 'space', -> ' '
 
 TemplateHelpers.add

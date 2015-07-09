@@ -89,10 +89,10 @@ CBGA.setupCollections = ->
 allowsDone = []
 deniesDone = []
 setupClassAllows = (_class, collection) ->
-    if _class.allow? and allowsDone.indexOf(_class) is -1
+    if _class?.allow? and allowsDone.indexOf(_class) is -1
         allowsDone.push _class
         collection.allow _class.allow
-    if _class.deny? and deniesDone.indexOf(_class) is -1
+    if _class?.deny? and deniesDone.indexOf(_class) is -1
         deniesDone.push _class
         collection.deny _class.deny
 
