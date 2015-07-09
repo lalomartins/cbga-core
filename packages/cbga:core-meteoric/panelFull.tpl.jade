@@ -1,8 +1,0 @@
-.game-panel.card(id=id class=panelClass)
-  i.panel-label(class=icon)
-    i.panel-title-attribution= titleAttribution
-    = panel.title
-  +controller.renderFull
-  if controller.hasCounters
-    .item.panel-counters
-      +controller.renderCounters
