@@ -73,16 +73,23 @@ class ui.ComponentType
       else
         "#{count} #{@displayNamePlural}"
 
-  renderSummary: (container) ->
+  getCounterTemplate: (count, rules) ->
+    if count > @stackAfter
+      if @summaryTemplate
+        Template[@summaryTemplate]
+      else
+        Template["#{rules.replace /\s/g, ''}CounterSummary"] ? Template.counterSummaryDefault
+    else
+      if @template
+        Template[@template]
+      else
+        Template["#{rules.replace /\s/g, ''}Counter"] ? Template.counterDefault
+
+  renderCounter: (container) ->
     if @stackProperty?
       # oh boy
       new Blaze.Template =>
         container ?= Template.currentData()
-        template = if @template
-          Template[@template]
-        else
-          rules = container.rules.name
-          Template["#{rules.replace /\s/g, ''}ComponentSummary"] ? Template.componentDefaultSummary
         # Since this is a template render function, it's already reactive
         values = {}
         fields = {}
@@ -94,23 +101,30 @@ class ui.ComponentType
         .forEach (doc) =>
           values[doc[@stackProperty]] = true
           return
-        # Again, needs to consider stackAfter
-        _.map _.keys(values), (value) =>
+        for value, __ of values
           selector = type: @name
           selector[@stackProperty] = value
           cursor = container.find selector
-          Blaze.With (=> type: @, stack: value, count: cursor.count()), ->
-            template
+          count = cursor.count()
+          if cursor.count() > @stackAfter
+            Blaze.With (=> type: @, stack: value, count: count), =>
+              @getCounterTemplate count, container.rules.name
+          else
+            for i in [1..count]
+              Blaze.With (=> type: @, stack: value, i: i), =>
+                @getCounterTemplate count, container.rules.name
     else
       new Blaze.Template =>
         container ?= Template.currentData()
-        template = if @template
-          Template[@template]
-        else
-          rules = container.rules.name
-          Template["#{rules.replace /\s/g, ''}ComponentSummary"] ? Template.componentDefaultSummary
         cursor = container.find type: @name
-        Blaze.With (=> type: @, count: cursor.count()), -> template
+        count = cursor.count()
+        if cursor.count() > @stackAfter
+          Blaze.With (=> type: @, count: count), =>
+            @getCounterTemplate count, container.rules.name
+        else
+          for i in [1..count]
+            Blaze.With (=> type: @, i: i), =>
+              @getCounterTemplate count, container.rules.name
 
 class ui.Controller extends EventEmitter
   # does nothing for now, but can be used for instanceof
@@ -135,14 +149,13 @@ class ui.PanelContainerContoller extends ui.Controller
       type.isCounter
 
   renderCounters: (owner) ->
-    # XXX: this isn't right at all, it should consider stackAfter
     if @panel.contains?
       new Blaze.Template =>
         owner ?= Template.currentData().owner
         _.map @panel.contains, (typeName) =>
           type = @rules.getComponentType typeName
           if type.isCounter
-            type.renderSummary @getContainer owner
+            type.renderCounter @getContainer owner
 
   renderFull: (owner) ->
     if @panel.contains?
