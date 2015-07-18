@@ -31,10 +31,18 @@ class ui.Slot
 
 
 class ui.ComponentStack
-  constructor: ({@uiType, @container, @stack, @count}) ->
+  constructor: ({@uiType, container, @stack, @count}) ->
     @type = @uiType.name
+    @_container = container
     check @uiType, ui.ComponentType
     check @count, Number
+    check container, CBGA.Container
+    # pretend we're a component
+    if @stack?
+      @[@uiType.stackProperty] = @stack
+
+  # for compatibility with the Component API
+  container: -> @_container
 
 
 class ui.ComponentType
@@ -136,6 +144,7 @@ class ui.ComponentType
           Blaze.With (=> type: @, container: container), =>
             Blaze.Each (-> cursor), =>
               @getCounterTemplate count, container.rules.name
+
 
 class ui.Controller extends EventEmitter
   # does nothing for now, but can be used for instanceof
