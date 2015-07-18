@@ -30,9 +30,14 @@ class ui.Slot
     check @panel, ui.Panel
 
 
+class ui.ComponentStack
+  constructor: ({@type, @container, @stack, @count}) ->
+
+
 class ui.ComponentType
   constructor: ({@name, @width, @height, @isCounter, @stackProperty, @stackAfter,
-                 @displayNameSingular, @displayNamePlural, @template} = {}) ->
+                 @displayNameSingular, @displayNamePlural,
+                 @draggable, @template} = {}) ->
     check @name, String
     check @width, Match.Optional Number
     check @height, Match.Optional Number
@@ -50,6 +55,8 @@ class ui.ComponentType
     @displayNamePlural ?= @displayNameSingular
     check @displayNamePlural, String
     check @template, Match.Optional String
+    @draggable ?= false
+    check @draggable, Boolean
 
   render: (component) ->
     new Blaze.Template =>
@@ -59,7 +66,8 @@ class ui.ComponentType
       else
         rules = component.game().rules
         Template["#{rules.replace /\s/g, ''}ComponentView"] ? Template.componentDefaultView
-      Blaze.With component, -> template
+      Blaze.With (type: @, component: component), ->
+        Blaze.With component, -> template
 
   summary: (count, stack) ->
     if stack?
@@ -107,11 +115,11 @@ class ui.ComponentType
           cursor = container.find selector
           count = cursor.count()
           if cursor.count() > @stackAfter
-            Blaze.With (=> type: @, stack: value, count: count), =>
+            Blaze.With (new ui.ComponentStack type: @, stack: value, count: count), =>
               @getCounterTemplate count, container.rules.name
           else
-            for i in [1..count]
-              Blaze.With (=> type: @, stack: value, i: i), =>
+            Blaze.With (type: @, stack: value, container: container), =>
+              Blaze.Each (-> cursor), =>
                 @getCounterTemplate count, container.rules.name
     else
       new Blaze.Template =>
@@ -119,11 +127,11 @@ class ui.ComponentType
         cursor = container.find type: @name
         count = cursor.count()
         if cursor.count() > @stackAfter
-          Blaze.With (=> type: @, count: count), =>
+          Blaze.With (new ui.ComponentStack type: @, count: count), =>
             @getCounterTemplate count, container.rules.name
         else
-          for i in [1..count]
-            Blaze.With (=> type: @, i: i), =>
+          Blaze.With (=> type: @, container: container), =>
+            Blaze.Each (-> cursor), =>
               @getCounterTemplate count, container.rules.name
 
 class ui.Controller extends EventEmitter
