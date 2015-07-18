@@ -31,7 +31,10 @@ class ui.Slot
 
 
 class ui.ComponentStack
-  constructor: ({@type, @container, @stack, @count}) ->
+  constructor: ({@uiType, @container, @stack, @count}) ->
+    @type = @uiType.name
+    check @uiType, ui.ComponentType
+    check @count, Number
 
 
 class ui.ComponentType
@@ -115,7 +118,7 @@ class ui.ComponentType
           cursor = container.find selector
           count = cursor.count()
           if cursor.count() > @stackAfter
-            Blaze.With (new ui.ComponentStack type: @, stack: value, count: count), =>
+            Blaze.With (new ui.ComponentStack uiType: @, container: container, stack: value, count: count), =>
               @getCounterTemplate count, container.rules.name
           else
             Blaze.With (type: @, stack: value, container: container), =>
@@ -127,7 +130,7 @@ class ui.ComponentType
         cursor = container.find type: @name
         count = cursor.count()
         if cursor.count() > @stackAfter
-          Blaze.With (new ui.ComponentStack type: @, count: count), =>
+          Blaze.With (new ui.ComponentStack uiType: @, container: container, count: count), =>
             @getCounterTemplate count, container.rules.name
         else
           Blaze.With (=> type: @, container: container), =>
@@ -264,14 +267,15 @@ class ui.DragAndDropOperation
     view = Blaze.getView @element
     while view and view isnt Blaze.currentView
       data = Blaze.getData view
-      if data instanceof CBGA.Component and not @component?
+      if (data instanceof CBGA.Component or data instanceof ui.ComponentStack) \
+          and not @component?
         @component = data
       if data.controller? and data.owner? and not @sourceController?
         @sourceController = data.controller
         @sourceOwner = data.owner
       break if @component? and @sourceController?
       view = view.parentView
-    check @component, CBGA.Component
+    check @component, Match.OneOf CBGA.Component, ui.ComponentStack
     check @sourceController, ui.Controller
     event.originalEvent.dataTransfer.setData 'application/vnd-cbga-dnd', @_id
     event.originalEvent.dataTransfer.setData "application/vnd-cbga:#{@_id}", 'dnd'
