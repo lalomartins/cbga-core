@@ -26,33 +26,38 @@ Meteor.publish 'cbga-container-counts-for-game', (gameId) ->
   handles = []
   containersPublished = {}
 
-  containerDocFromContainer = (container) ->
-    _id: [game._id, container[0], container[1], container[2]].join '/'
+  containerDocFromContainer = (container, type) ->
+    _id: [game._id, container[0], container[1], container[2], type].join '/'
     game: game._id
-    type: container[0]
+    ownerType: container[0]
     owner: container[1]
     name: container[2]
     private: container[3]
+    type: type
     count: 0
 
-  containerDocFromController = (controller, owner) ->
+  containerDocFromController = (controller, type, owner) ->
     owner ?= game
     container = controller.getContainer owner
-    containerDocFromContainer container._toDb()
+    containerDocFromContainer container._toDb(), type
 
   for panel in rules.uiDefs.panels
     controller = rules.getController 'panel', panel.id
     if panel.owner is 'player'
       handles.push CBGA.Players.find(_game: game._id).observeChanges
         added: (id, document) =>
-          containerDoc = containerDocFromController controller, id
-          @added 'cbga-container-counts', containerDoc._id, containerDoc
+          for type in panel.contains
+            containerDoc = containerDocFromController controller, type, id
+            containersPublished[containerDoc._id] = true
+            @added 'cbga-container-counts', containerDoc._id, containerDoc
     else
-      containerDoc = containerDocFromController controller
-      @added 'cbga-container-counts', containerDoc._id, containerDoc
+      for type in panel.contains
+        containerDoc = containerDocFromController controller, type
+        containersPublished[containerDoc._id] = true
+        @added 'cbga-container-counts', containerDoc._id, containerDoc
 
   updateCount = (document) =>
-    containerDoc = containerDocFromContainer document._container
+    containerDoc = containerDocFromContainer document._container, document.type
     if containerDoc._id of containersPublished
       containerDoc.count = CBGA.Components.find
         _game: game._id
