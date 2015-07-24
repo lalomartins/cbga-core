@@ -101,7 +101,7 @@ class CBGA.GameRules
         when arg instanceof CBGA.ui.Controller
           @_controllers[arg.widget][arg.id] = arg
         when arg instanceof CBGA.ui.Panel
-          @_controllers.panel[arg.id] = new CBGA.ui.PanelContainerContoller
+          @_controllers.panel[arg.id] = new CBGA.ui.PanelContainerController
             rules: @
             panel: arg
         when arg instanceof CBGA.ui.Slot
@@ -111,7 +111,7 @@ class CBGA.GameRules
           # panel_id/slot_id
           throw new Error 'not yet implemented'
         else
-          @_controllers.panel[arg] = new CBGA.ui.PanelContainerContoller
+          @_controllers.panel[arg] = new CBGA.ui.PanelContainerController
             rules: @
             panel: arg
 

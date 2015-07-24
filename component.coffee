@@ -38,7 +38,8 @@ class CBGA.Container
   # Note, if you create Containers in your _setupTransients, you MUST
   # pass in the owner object; if you pass @_id, there will be an infinite
   # loop trying to wrap it at the end.
-  constructor: ([@type, @ownerId, @name]) ->
+  constructor: ([@type, @ownerId, @name, @private]) ->
+    @private ?= false
     unless Match.test @type, Match.OneOf 'game', 'player'
       throw new Error "invalid container type #{@type}"
 
@@ -70,12 +71,12 @@ class CBGA.Container
       else
         @owner = @rules.wrapPlayer @owner
 
-  @_wrap: (triplet) ->
-    if triplet?
-      new @ triplet
+  @_wrap: (data) ->
+    if data?
+      new @ data
 
   _toDb: ->
-    [@type, @ownerId, @name]
+    [@type, @ownerId, @name, @private]
 
   find: (selector, options) ->
     selector ?= {}
@@ -125,7 +126,10 @@ class CBGA.OrderedContainer extends CBGA.Container
     # XXX: This *could* race-condition if a game is concurrent enough
     # (If yours is, subclass and do something more clever)
     last = @last()
-    properties.position = last.position + 1
+    properties.position = if last?
+      last.position + 1
+    else
+      0
 
   componentRemoved: (component) ->
     @repack()

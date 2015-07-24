@@ -5,7 +5,7 @@ getNextController = (context) ->
 
 class ui.Panel
   constructor: ({@id, @title, @owner, @visibility, @icon, @contains,
-                 @containerClass, slots} = {}) ->
+                 @private, @containerClass, slots} = {}) ->
     check @id, String
     @owner ?= 'game'
     @visibility ?= 'public'
@@ -150,7 +150,7 @@ class ui.Controller extends EventEmitter
   # does nothing for now, but can be used for instanceof
 
 
-class ui.PanelContainerContoller extends ui.Controller
+class ui.PanelContainerController extends ui.Controller
   constructor: ({@rules, @panel, @container} = {}) ->
     @widget = 'panel'
     if typeof @rules is 'string'
@@ -224,7 +224,7 @@ class ui.PanelContainerContoller extends ui.Controller
 
   getContainer: (owner) ->
     owner ?= @getOwner()
-    new @panel.containerClass [@panel.owner, owner, @panel.id]
+    new @panel.containerClass [@panel.owner, owner, @panel.id, @panel.private]
 
   # This method sets alternate representations of the component, in case a
   # player drags it somewhere else, such as a text editor or Facebook post

@@ -74,8 +74,11 @@ CBGA.setupCollections = ->
             return true if _.any fieldNames, (name) -> name is '_game' or name is 'type'
             result = CBGA.utils.simulateMongoUpdate doc, modifier
             return true unless result._container instanceof Array and \
-                result._container.length is 3 and \
-                _.every result._container, (s) -> typeof s is 'string'
+                result._container.length is 4 and \
+                typeof result._container[0] is 'string' and \
+                typeof result._container[1] is 'string' and \
+                typeof result._container[2] is 'string' and \
+                typeof result._container[3] is 'boolean'
             false
     share.setupAllows()
 
