@@ -84,12 +84,12 @@ class ui.ComponentType
     if stack?
       if count is 1
         "1 #{stack} #{@displayNameSingular}"
-      else
+      else if count
         "#{count} #{stack} #{@displayNamePlural}"
     else
       if count is 1
         "1 #{@displayNameSingular}"
-      else
+      else if count
         "#{count} #{@displayNamePlural}"
 
   getCounterTemplate: (count, rules) ->
@@ -198,17 +198,12 @@ class ui.PanelContainerController extends ui.Controller
 
   summary: (owner) ->
     owner ?= Template.currentData().owner
-    counts = {}
-    # Go directly to the collection to sidestep the transform
-    # (could also use transform=null but this is faster)
-    CBGA.Components.find _container: [@panel.owner, owner._id, @container],
-      fields: type: 1
-    .forEach (doc) ->
-      counts[doc.type] ?= 0
-      counts[doc.type] += 1
-      return
-    for type, count of counts
-      @rules.getComponentType(type).summary(count)
+    CBGA.ContainerCounts.find
+      ownerType: @panel.owner
+      owner: owner._id
+      name: @container
+    .map (container) =>
+      @rules.getComponentType(container.type).summary(container.count)
 
   getOwner: (elementOrView) ->
     # elementOrView can also be undefined for the current view
