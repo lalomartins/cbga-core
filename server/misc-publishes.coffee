@@ -15,6 +15,7 @@ Meteor.publish 'cbga-components-for-game', (gameId) ->
     _game: gameId
     $or: [
       '_container.1': player._id
+      '_container.3': true
     ,
       '_container.3': false
     ]

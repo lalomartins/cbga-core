@@ -32,7 +32,7 @@ class CBGA.Component extends CBGA._DbModelBase
 class CBGA.Container
   # A Container is a “place” where Components can be.
   # Containers are *NOT* real database objects; they're represented
-  # by a [type, id, name] triplet, where name is an arbitrary string
+  # by a [type, id, name, private] quad, where name is an arbitrary string
   # (e.g. 'hand') and type is 'game' or 'player'.
 
   # Note, if you create Containers in your _setupTransients, you MUST
