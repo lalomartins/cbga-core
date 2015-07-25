@@ -187,16 +187,33 @@ class ui.PanelContainerController extends ui.Controller
         _.map @panel.contains, (typeName) =>
           type = @rules.getComponentType typeName
           unless type.isCounter
-            Blaze.Each (=> @getContainer(owner).find type: typeName), =>
-              component = Template.currentData()
-              type.render component
+            cursor = @getContainer(owner).find type: typeName
+            HTML.DIV class: ['game-panel-component-type', ' ',
+                             "game-panel-component-type-#{typeName}"], [
+              Blaze.Each (=> cursor), =>
+                component = Template.currentData()
+                type.render component
+              if @panel.visibility is 'stack'
+                # XXX use a template
+                HTML.DIV class: ['item', ' ', 'component-summary', ' ',
+                                 'game-panel-component-type-count'],
+                  type.summary cursor.count()
+              ]
     else
       new Blaze.Template =>
         owner ?= Template.currentData().owner
-        [Blaze.Each (=> @getContainer(owner).find()), =>
-          component = Template.currentData()
-          type = @rules.getComponentType component.type
-          type.render component
+        cursor = @getContainer(owner).find()
+        HTML.DIV class: ['game-panel-component-type'], [
+          [Blaze.Each (=> cursor), =>
+            component = Template.currentData()
+            type = @rules.getComponentType component.type
+            type.render component
+          ]
+          if @panel.visibility is 'stack'
+            # XXX use a template
+            HTML.DIV class: ['item', ' ', 'component-summary', ' ',
+                             'game-panel-component-type-count'],
+              type.summary cursor.count()
         ]
 
   summary: (owner) ->
