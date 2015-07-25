@@ -4,12 +4,15 @@ getNextController = (context) ->
 
 
 class ui.Panel
-  constructor: ({@id, @title, @owner, @visibility, @icon, @contains,
+  constructor: ({@id, @title, @owner, @visibility, @icon, @contains, @provides,
                  @private, @containerClass, slots} = {}) ->
     check @id, String
     @owner ?= 'game'
     @visibility ?= 'public'
-    check @contains, Match.Optional [String]
+    @contains ?= []
+    check @contains, [String]
+    @provides ?= []
+    check @provides, [String]
     @containerClass ?= CBGA.Container
     check @containerClass, CBGA.Match.ClassOrSubclass CBGA.Container
     @slots = {}
@@ -164,12 +167,12 @@ class ui.PanelContainerController extends ui.Controller
     @container ?= @panel.id
 
   hasCounters: ->
-    _.any (@panel.contains ? []), (typeName) =>
+    _.any @panel.contains, (typeName) =>
       type = @rules.getComponentType typeName
       type.isCounter
 
   renderCounters: (owner) ->
-    if @panel.contains?
+    if @panel.contains.length
       new Blaze.Template =>
         owner ?= Template.currentData().owner
         _.map @panel.contains, (typeName) =>
@@ -178,7 +181,7 @@ class ui.PanelContainerController extends ui.Controller
             type.renderCounter @getContainer owner
 
   renderFull: (owner) ->
-    if @panel.contains?
+    if @panel.contains.length
       new Blaze.Template =>
         owner ?= Template.currentData().owner
         _.map @panel.contains, (typeName) =>
@@ -197,13 +200,19 @@ class ui.PanelContainerController extends ui.Controller
         ]
 
   summary: (owner) ->
+    # XXX missing stackProperty
     owner ?= Template.currentData().owner
     CBGA.ContainerCounts.find
       ownerType: @panel.owner
       owner: owner._id
       name: @container
     .map (container) =>
-      @rules.getComponentType(container.type).summary(container.count)
+      type = @rules.getComponentType(container.type)
+      type: container.type
+      typeInfo: type
+      container: container
+      text: type.summary(container.count)
+      provider: type.draggable and container.type in @panel.provides
 
   getOwner: (elementOrView) ->
     # elementOrView can also be undefined for the current view
@@ -234,7 +243,7 @@ class ui.PanelContainerController extends ui.Controller
     return unless operation
     owner = @getOwner(event.currentTarget)
     return if operation.sourceOwner._id is owner._id and operation.sourceController is @
-    if (not @panel.contains?) or \
+    if (not @panel.contains.length) or \
        @panel.contains.indexOf(operation.component.type) > -1
       $(event.currentTarget).addClass 'drag-allowed'
       event.preventDefault()
@@ -257,12 +266,45 @@ class ui.PanelContainerController extends ui.Controller
 
   # Override this to set other properties on move; but ideally don't, if
   # possible, that should be done in the container class instead
-  doMoveComponent: (component, owner, oldContainer) ->
-    component.moveTo @getContainer owner
-    # This should probably be on Container, but it's a bit messy wrt container
-    # classes right now, and that's going to be refactored next thing, so for
-    # now here works
-    oldContainer?.componentRemoved?(component)
+  doMoveComponent: (component, owner, oldContainer, count = 1) ->
+    if component instanceof CBGA.Component
+      if count is 1
+        component.moveTo @getContainer owner
+        # This should probably be on Container, but it's a bit messy wrt container
+        # classes right now, and that's going to be refactored next thing, so for
+        # now here works
+        oldContainer?.componentRemoved?(component)
+      else
+        type = @rules.getComponentType component.type
+        selector = type: component.type
+        if type.stackProperty?
+          selector[type.stackProperty] = component[type.stackProperty]
+        removed = []
+        component.container().find selector, limit: count
+        .forEach (eachComponent) =>
+          eachComponent.moveTo @getContainer owner
+          removed.push eachComponent
+        sourceContainer.componentsRemoved?(removed)
+
+    else if component.provider
+      # This can't be done on the client because typically a provider is private
+      # (deck of cards, for example)
+      target = @getContainer owner
+      options =
+        rules: @rules.name
+        type: component.type
+        source:
+          type: component.container.ownerType
+          owner: component.container.owner
+          name: component.container.name
+          private: component.container.private
+        target:
+          type: target.type
+          owner: owner._id
+          name: target.name
+          private: target.private
+        count: count
+      Meteor.call 'component.draw', options
 
 
 class ui.DragAndDropOperation
@@ -271,7 +313,8 @@ class ui.DragAndDropOperation
     view = Blaze.getView @element
     while view and view isnt Blaze.currentView
       data = Blaze.getData view
-      if (data instanceof CBGA.Component or data instanceof ui.ComponentStack) \
+      if (data instanceof CBGA.Component or data instanceof ui.ComponentStack or
+          data.provider) \
           and not @component?
         @component = data
       if data.controller? and data.owner? and not @sourceController?
@@ -279,7 +322,9 @@ class ui.DragAndDropOperation
         @sourceOwner = data.owner
       break if @component? and @sourceController?
       view = view.parentView
-    check @component, Match.OneOf CBGA.Component, ui.ComponentStack
+    check @component, Match.OneOf CBGA.Component, ui.ComponentStack,
+      Match.ObjectIncluding provider: Boolean, type: String,
+        typeInfo: ui.ComponentType
     check @sourceController, ui.Controller
     event.originalEvent.dataTransfer.setData 'application/vnd-cbga-dnd', @_id
     event.originalEvent.dataTransfer.setData "application/vnd-cbga:#{@_id}", 'dnd'
@@ -320,23 +365,27 @@ class DragAndDropService
       , 1000
 
   installHandlers: (template,
-                    componentSelector = '.component[draggable]',
+                    componentSelector = '.component[draggable], .provider[draggable]',
                     panelSelector = '.game-panel') ->
     handlers = {}
-    handlers["dragstart #{componentSelector}"] = (event, ti) =>
+
+    makeKey = (event, selector) ->
+      ("#{event} #{sel}" for sel in selector.split ',').join ', '
+
+    handlers[makeKey 'dragstart', componentSelector] = (event, ti) =>
       @start event
       true
 
-    handlers["dragend #{componentSelector}"] = (event, ti) =>
+    handlers[makeKey 'dragend', componentSelector] = (event, ti) =>
       @discard event
 
-    handlers["dragover #{panelSelector}"] = (event) ->
+    handlers[makeKey 'dragover', panelSelector] = (event) ->
       @controller.handleDragOver event
 
-    handlers["dragleave #{panelSelector}"] = (event) ->
+    handlers[makeKey 'dragleave', panelSelector] = (event) ->
       @controller.handleDragLeave event
 
-    handlers["drop #{panelSelector}"] = (event) ->
+    handlers[makeKey 'drop', panelSelector] = (event) ->
       @controller.handleDrop event
 
     template.events handlers
