@@ -185,11 +185,12 @@ class ui.PanelContainerController extends ui.Controller
       new Blaze.Template =>
         owner ?= Template.currentData().owner
         _.map @panel.contains, (typeName) =>
+          typeId = typeName.replace /\s/g, '-'
           type = @rules.getComponentType typeName
           unless type.isCounter
             cursor = @getContainer(owner).find type: typeName
             HTML.DIV class: ['game-panel-component-type', ' ',
-                             "game-panel-component-type-#{typeName}"], [
+                             "game-panel-component-type-#{typeId}"], [
               Blaze.Each (=> cursor), =>
                 component = Template.currentData()
                 type.render component
