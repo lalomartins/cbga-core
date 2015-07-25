@@ -29,7 +29,6 @@ Meteor.methods
     unless Meteor.userId()
       throw new Metor.Error 'Not allowed', 'must be logged in'
     rules = CBGA.getGameRules options.rules
-    console.log options
     selector = type: options.type
     if options.stack?
       type = rules.getComponentType options.type

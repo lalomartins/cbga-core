@@ -22,6 +22,7 @@ Meteor.publish 'cbga-components-for-game', (gameId) ->
 
 Meteor.publish 'cbga-container-counts-for-game', (gameId) ->
   # This uses UI defs to find out what to publish
+  # XXX missing stackProperty
   game = CBGA.findGame gameId
   rules = CBGA.getGameRules game.rules
   handles = []
@@ -57,7 +58,7 @@ Meteor.publish 'cbga-container-counts-for-game', (gameId) ->
         containersPublished[containerDoc._id] = true
         @added 'cbga-container-counts', containerDoc._id, containerDoc
 
-  updateCount = (document) =>
+  updateCount = (document, oldDocument) =>
     containerDoc = containerDocFromContainer document._container, document.type
     if containerDoc._id of containersPublished
       containerDoc.count = CBGA.Components.find
@@ -65,7 +66,11 @@ Meteor.publish 'cbga-container-counts-for-game', (gameId) ->
         _container: document._container
       .count()
       @changed 'cbga-container-counts', containerDoc._id, containerDoc
-  handles.push CBGA.Components.find(_game: game._id).observe
+      if oldDocument?
+        updateCount oldDocument
+  handles.push CBGA.Components.find(_game: game._id,
+    fields: _container: 1, position: 1, type: 1
+  ).observe
     added: updateCount
     changed: updateCount
     removed: updateCount

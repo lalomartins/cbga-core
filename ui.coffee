@@ -212,7 +212,7 @@ class ui.PanelContainerController extends ui.Controller
       typeInfo: type
       container: container
       text: type.summary(container.count)
-      provider: type.draggable and container.type in @panel.provides
+      provider: type.draggable and container.count and container.type in @panel.provides
 
   getOwner: (elementOrView) ->
     # elementOrView can also be undefined for the current view
