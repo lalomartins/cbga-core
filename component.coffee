@@ -1,90 +1,53 @@
 class CBGA.Component extends CBGA._DbModelBase
-  # A Component is defined as something that can be moved in the game.
+  # A Component is defined as something that can be moved in the game, *or*
+  # something that can contain other Components.
   # In most games, that means cards, tokens, player markers, meeples,
-  # and so on. Boards, character sheets *don't* need to be Components.
-  constructor: (game, container) ->
-    unless container? and game?
-      throw new Error 'Component needs a game and a container'
+  # and so on; but they can also be something more abstract, such as a
+  # player's hand or tableau.
+  # Boards, character sheets *don't* need to be Components (unless
+  # you put components on them).
+  constructor: (game, player, container) ->
+    check game, CBGA.Game
+    check player, Match.Optional Match.OneOf CBGA.Player, String
+    check container, Match.Optional Match.OneOf CBGA.Component, String
     super
     @_game = game._id ? game
-    @_container = container?._toDb?() ? container
+    @_player = player?._id ? player
+    @_container = container?._id ? container
 
   @_wrap: (doc) ->
     (CBGA.getGameRules doc).wrapComponent doc
 
-  game: -> CBGA.Games.findOne @_game
-  # XXX must subclass to override container class, there's probably a better way
-  container: -> CBGA.Container._wrap @_container
+  game: -> CBGA.findGame @_game
+  player: -> (CBGA.getGameRules @).findPlayer @_player
+  container: -> (CBGA.getGameRules @).findComponent @_container
 
   moveTo: (container, properties) ->
     properties ?= {}
-    properties._container = container._toDb?() ? container
-    if properties._container[1]._id?
-      properties._container[1] = properties._container[1]._id
-    # This is not ideal, since the `container` argument might just be an
-    # array. It will be better after the refactoring.
+    unless container._id?
+      container_ = (CBGA.getGameRules @).findComponent container
+      if container_?
+        container = container_
+      else
+        throw new Error "invalid container #{container}"
+    properties._container = container._id
     container.acceptNewComponent?(@, properties)
     for name, value of properties
       @[name] = value
     @emit 'changed', $set: properties
 
 
-class CBGA.Container
-  # A Container is a “place” where Components can be.
-  # Containers are *NOT* real database objects; they're represented
-  # by a [type, id, name, private] quad, where name is an arbitrary string
-  # (e.g. 'hand') and type is 'game' or 'player'.
-
-  # Note, if you create Containers in your _setupTransients, you MUST
-  # pass in the owner object; if you pass @_id, there will be an infinite
-  # loop trying to wrap it at the end.
-  constructor: ([@type, @ownerId, @name, @private]) ->
-    @private ?= false
-    unless Match.test @type, Match.OneOf 'game', 'player'
-      throw new Error "invalid container type #{@type}"
-
-    if typeof @ownerId is 'object'
-      @owner = @ownerId
-      @ownerId = @owner._id
-      if @type is 'game' and @owner instanceof CBGA.Player
-        throw new Error "type is game but owner is player"
-      if @type is 'player' and @owner instanceof CBGA.Game
-        throw new Error "type is player but owner is game"
-    else
-      # Right… so first we need to get the owner from the db, then if
-      # it's a player get the game, and only then we can get the rules,
-      # which we need to wrap.
-      # XXX: maybe a Rules.newContainer helper?
-      collection = if @type is 'game'
-          CBGA.Games
-        else
-          CBGA.Players
-      @owner = collection.findOne @ownerId
-    rulesName = if @type is 'game'
-      @owner.rules
-    else
-      CBGA.Games.findOne(@owner._game).rules
-    @rules = CBGA.getGameRules rulesName
-    unless @owner instanceof CBGA._DbModelBase
-      rulesName = if @type is 'game'
-        @owner = @rules.wrapGame @owner
-      else
-        @owner = @rules.wrapPlayer @owner
-
-  @_wrap: (data) ->
-    if data?
-      new @ data
-
-  _toDb: ->
-    [@type, @ownerId, @name, @private]
+class CBGA.Container extends CBGA.Component
+  constructor: (game, player, container, @_private) ->
+    @_private ?= false
+    super game, player, container
 
   find: (selector, options) ->
     selector ?= {}
     if typeof selector isnt 'string'
-      selector._container = @_toDb()
-    @rules.findComponents selector, options
+      selector._container = @_id
+    (CBGA.getGameRules @game().rules).findComponents selector, options
 
-  # For completeness, because I surprised myself expecting it to exist
   findOne: (selector, options) ->
     options ?= {}
     options.limit = 1
@@ -105,7 +68,7 @@ class CBGA.OrderedContainer extends CBGA.Container
     @findOne selector, options
 
   shuffle: ->
-    ids = _.pluck CBGA.Components.find(_container: @_toDb(),
+    ids = _.pluck CBGA.Components.find(_container: @_id,
       fields: _id: 1
     ).fetch(), '_id'
     _.shuffle ids
@@ -113,7 +76,7 @@ class CBGA.OrderedContainer extends CBGA.Container
 
   repack: (ids) ->
     unless ids?
-      ids = _.pluck CBGA.Components.find(_container: @_toDb(),
+      ids = _.pluck CBGA.Components.find(_container: @_id,
         fields: _id: 1
       ).fetch(), '_id'
     position = 0

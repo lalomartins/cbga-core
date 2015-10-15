@@ -4,17 +4,15 @@ getNextController = (context) ->
 
 
 class ui.Panel
-  constructor: ({@id, @title, @owner, @visibility, @icon, @contains, @provides,
-                 @private, @containerClass, slots} = {}) ->
-    check @id, String
+  constructor: ({@name, @title, @owner, @visibility, @icon, @contains, @provides,
+                 @private, slots} = {}) ->
+    check @name, String
     @owner ?= 'game'
     @visibility ?= 'public'
     @contains ?= []
     check @contains, [String]
     @provides ?= []
     check @provides, [String]
-    @containerClass ?= CBGA.Container
-    check @containerClass, CBGA.Match.ClassOrSubclass CBGA.Container
     @slots = {}
     for slot in slots ? []
       if slot instanceof ui.Slot
@@ -160,11 +158,11 @@ class ui.PanelContainerController extends ui.Controller
       @rules = CBGA.getGameRules @rules
     check @rules, CBGA.GameRules
     if typeof @panel is 'string'
-      @panel = _.find @rules.uiDefs.panels, (panel) -> panel.id is @panel
+      @panel = _.find @rules.uiDefs.panels, (panel) -> panel.name is @panel
     check @panel, ui.Panel
-    @id = @panel.id
+    @name = @panel.name
     check @container, Match.Optional String
-    @container ?= @panel.id
+    @container ?= @panel.name
 
   hasCounters: ->
     _.any @panel.contains, (typeName) =>
@@ -246,7 +244,10 @@ class ui.PanelContainerController extends ui.Controller
 
   getContainer: (owner) ->
     owner ?= @getOwner()
-    new @panel.containerClass [@panel.owner, owner, @panel.id, @panel.private]
+    if @panel.owner is 'player'
+      owner.game().getContainers([@panel.name], owner)[0]
+    else
+      owner.getContainers([@panel.name])[0]
 
   # This method sets alternate representations of the component, in case a
   # player drags it somewhere else, such as a text editor or Facebook post

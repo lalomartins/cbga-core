@@ -1,6 +1,6 @@
 Package.describe({
   name: 'cbga:core',
-  version: '0.0.1',
+  version: '0.0.2',
   summary: 'Card and Board Game App API and core functionality',
   git: 'https://github.com/lalomartins/cbga-core.git',
   documentation: 'README.md',

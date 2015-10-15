@@ -66,6 +66,25 @@ class CBGA.Game extends CBGA._DbModelBase
         @_setup2 rules, players, update
         @emit 'changed', update
 
+    getContainers: (names, player) ->
+        containers = []
+        byName = {}
+        rules = CBGA.getGameRules @rules
+        unless rules?
+            throw new CBGA.GameError "Couldn't find rules for '#{gameDoc.rules}'"
+        rules.findComponents
+            _game: @._id
+            _player: if player?
+                player._id ? player
+            else
+                $exists: false
+            _container: $exists: false
+            name: $in: names
+        .forEach (component) ->
+            byName[component.name] = component
+        byName[name] for name in names
+
+
     components: (container) ->
         rules = CBGA.getGameRules @rules
         unless rules?

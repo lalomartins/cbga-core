@@ -13,43 +13,57 @@ Meteor.publish 'cbga-components-for-game', (gameId) ->
   player = CBGA.Players.findOne _game: gameId, _user: @userId
   CBGA.Components.find
     _game: gameId
+    _container: $exists: false
+    # if the _private property doesn't exist, it's not a container
     $or: [
-      '_container.1': player._id
-      '_container.3': true
+      '_player': player._id
+      '_private': true
     ,
-      '_container.3': false
+      '_private': false
     ]
 
 Meteor.publish 'cbga-container-counts-for-game', (gameId) ->
   # This uses UI defs to find out what to publish
   # XXX missing stackProperty
   game = CBGA.findGame gameId
+  # XXX must update if containers are created
+  return unless game.started?
   rules = CBGA.getGameRules game.rules
   handles = []
   containersPublished = {}
 
   containerDocFromContainer = (container, type) ->
-    _id: [game._id, container[0], container[1], container[2], type].join '/'
-    game: game._id
-    ownerType: container[0]
-    owner: container[1]
-    name: container[2]
-    private: container[3]
-    type: type
-    count: 0
+    if container?
+      unless container._id?
+        container = rules.findComponent container
+      _id: container._id
+      game: game._id
+      ownerType: if container._player?
+        'player'
+      else
+        'game'
+      owner: container._player ? container._game
+      name: container.name
+      private: container._private
+      type: type
+      count: 0
 
   containerDocFromController = (controller, type, owner) ->
     owner ?= game
     container = controller.getContainer owner
-    containerDocFromContainer container._toDb(), type
+    containerDocFromContainer container, type
 
   for panel in rules.uiDefs.panels
-    controller = rules.getController 'panel', panel.id
+    controller = rules.getController 'panel', panel.name
     if panel.owner is 'player'
       handles.push CBGA.Players.find(_game: game._id).observeChanges
         added: (id, document) =>
+          player = rules.wrapPlayer document
+          player._id = id
           for type in panel.contains
-            containerDoc = containerDocFromController controller, type, id
+            containerDoc = containerDocFromController controller, type, player
+            unless containerDoc?
+              console.error "missing container #{panel.name} for player #{id}"
             containersPublished[containerDoc._id] = true
             @added 'cbga-container-counts', containerDoc._id, containerDoc
     else
@@ -68,7 +82,7 @@ Meteor.publish 'cbga-container-counts-for-game', (gameId) ->
       @changed 'cbga-container-counts', containerDoc._id, containerDoc
       if oldDocument?
         updateCount oldDocument
-  handles.push CBGA.Components.find(_game: game._id,
+  handles.push CBGA.Components.find(_game: game._id, _container: $exists: true,
     fields: _container: 1, position: 1, type: 1
   ).observe
     added: updateCount

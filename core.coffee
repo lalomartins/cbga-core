@@ -16,7 +16,7 @@ class CBGA._DbModelBase extends EventEmitter
         tmp = new EventEmitter
         doc = {}
         for own field, value of @
-            unless field of tmp or value instanceof CBGA._DbModelBase or field.match /^__/
+            unless field of tmp or value instanceof CBGA._DbModelBase or value is undefined or field.match /^__/
                 doc[field] = value
         doc
 
