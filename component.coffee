@@ -10,17 +10,21 @@ class CBGA.Component extends CBGA._DbModelBase
     check game, CBGA.Game
     check player, Match.Optional Match.OneOf CBGA.Player, String
     check container, Match.Optional Match.OneOf CBGA.Component, String
+    if typeof container is 'string'
+      container = (CBGA.getGameRules game.rules).findComponent container
     super
     @_game = game._id ? game
     @_player = player?._id ? player
-    @_container = container?._id ? container
+    if container?
+      @_container = container._id
+      @_private = container._private
 
   @_wrap: (doc) ->
     (CBGA.getGameRules doc).wrapComponent doc
 
   game: -> CBGA.findGame @_game
-  player: -> (CBGA.getGameRules @).findPlayer @_player
-  container: -> (CBGA.getGameRules @).findComponent @_container
+  player: -> (CBGA.getGameRules @game().rules).findPlayer @_player
+  container: -> (CBGA.getGameRules @game().rules).findComponent @_container
 
   moveTo: (container, properties) ->
     properties ?= {}
@@ -31,16 +35,24 @@ class CBGA.Component extends CBGA._DbModelBase
       else
         throw new Error "invalid container #{container}"
     properties._container = container._id
+    properties._private ?= container._private
     container.acceptNewComponent?(@, properties)
     for name, value of properties
       @[name] = value
-    @emit 'changed', $set: properties
+    if container._player?
+      properties._player ?= container._player
+      @_player = properties._player
+      @emit 'changed', $set: properties
+    else if properties._player
+      @emit 'changed', $set: properties
+    else
+      @emit 'changed', $set: properties, $unset: _player: true
 
 
 class CBGA.Container extends CBGA.Component
   constructor: (game, player, container, @_private) ->
-    @_private ?= false
     super game, player, container
+    @_private ?= false
 
   find: (selector, options) ->
     selector ?= {}

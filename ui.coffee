@@ -182,6 +182,8 @@ class ui.PanelContainerController extends ui.Controller
     if @panel.contains.length
       new Blaze.Template =>
         owner ?= Template.currentData().owner
+        # XXX: Not sure why I used _.map instead of coffee's for.
+        # It does have the side effect of skipping undefineds (counters).
         _.map @panel.contains, (typeName) =>
           typeId = typeName.replace /\s/g, '-'
           type = @rules.getComponentType typeName

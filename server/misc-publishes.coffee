@@ -13,8 +13,6 @@ Meteor.publish 'cbga-components-for-game', (gameId) ->
   player = CBGA.Players.findOne _game: gameId, _user: @userId
   CBGA.Components.find
     _game: gameId
-    _container: $exists: false
-    # if the _private property doesn't exist, it's not a container
     $or: [
       '_player': player._id
       '_private': true
