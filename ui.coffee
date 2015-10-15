@@ -116,7 +116,7 @@ class ui.ComponentType
         fields[@stackProperty] = 1
         # Go directly to the collection to sidestep the transform
         # (could also use transform=null but this is faster)
-        CBGA.Components.find type: @name, _container: container._toDb(),
+        CBGA.Components.find type: @name, _container: container._id,
           fields: fields
         .forEach (doc) =>
           values[doc[@stackProperty]] = true
@@ -128,11 +128,11 @@ class ui.ComponentType
           count = cursor.count()
           if cursor.count() > @stackAfter
             Blaze.With (new ui.ComponentStack uiType: @, container: container, stack: value, count: count), =>
-              @getCounterTemplate count, container.rules.name
+              @getCounterTemplate count, container.game().rules
           else
             Blaze.With (type: @, stack: value, container: container), =>
               Blaze.Each (-> cursor), =>
-                @getCounterTemplate count, container.rules.name
+                @getCounterTemplate count, container.game().rules
     else
       new Blaze.Template =>
         container ?= Template.currentData()
@@ -140,7 +140,7 @@ class ui.ComponentType
         count = cursor.count()
         if cursor.count() > @stackAfter
           Blaze.With (new ui.ComponentStack uiType: @, container: container, count: count), =>
-            @getCounterTemplate count, container.rules.name
+            @getCounterTemplate count, container.game().rules
         else
           Blaze.With (=> type: @, container: container), =>
             Blaze.Each (-> cursor), =>
