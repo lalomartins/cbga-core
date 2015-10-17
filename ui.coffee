@@ -49,7 +49,7 @@ class ui.ComponentStack
 class ui.ComponentType
   constructor: ({@name, @width, @height, @isCounter, @stackProperty, @stackAfter,
                  @displayNameSingular, @displayNamePlural,
-                 @draggable, @template} = {}) ->
+                 @draggable, @template, @summaryTemplate} = {}) ->
     check @name, String
     check @width, Match.Optional Number
     check @height, Match.Optional Number
@@ -67,6 +67,7 @@ class ui.ComponentType
     @displayNamePlural ?= @displayNameSingular
     check @displayNamePlural, String
     check @template, Match.Optional String
+    check @summaryTemplate, Match.Optional String
     @draggable ?= false
     check @draggable, Boolean
 
@@ -130,7 +131,7 @@ class ui.ComponentType
             Blaze.With (new ui.ComponentStack uiType: @, container: container, stack: value, count: count), =>
               @getCounterTemplate count, container.game().rules
           else
-            Blaze.With (type: @, stack: value, container: container), =>
+            Blaze.With (uiType: @, stack: value, container: container), =>
               Blaze.Each (-> cursor), =>
                 @getCounterTemplate count, container.game().rules
     else
