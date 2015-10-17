@@ -1,8 +1,5 @@
 ui = CBGA.ui = {}
 
-getNextController = (context) ->
-
-
 class ui.Panel
   constructor: ({@name, @title, @owner, @visibility, @icon, @contains, @provides,
                  @private, slots} = {}) ->
@@ -25,6 +22,10 @@ class ui.Panel
 
 
 # Slots are really later on in the backlog, but here's the API anyway
+# Slots are for cases where exactly zero or one component of certain
+# characteristics can be played. For example, in Girls War, the current
+# trends have one slot for the positive trend, and one for the negative.
+# The units *may* be implemented with a slot for the manager.
 class ui.Slot
   constructor: ({@id, @title, @panel} = {}) ->
     check @id, String
@@ -48,8 +49,8 @@ class ui.ComponentStack
 
 class ui.ComponentType
   constructor: ({@name, @width, @height, @isCounter, @stackProperty, @stackAfter,
-                 @displayNameSingular, @displayNamePlural,
-                 @draggable, @template, @summaryTemplate} = {}) ->
+                 @displayNameSingular, @displayNamePlural, @controllerClass,
+                 @draggable, @contains, @template, @summaryTemplate} = {}) ->
     check @name, String
     check @width, Match.Optional Number
     check @height, Match.Optional Number
@@ -66,10 +67,14 @@ class ui.ComponentType
     check @displayNameSingular, String
     @displayNamePlural ?= @displayNameSingular
     check @displayNamePlural, String
-    check @template, Match.Optional String
-    check @summaryTemplate, Match.Optional String
+    @controllerClass ?= ui.ComponentController
+    check @controllerClass, CBGA.Match.ClassOrSubclass ui.Controller
     @draggable ?= false
     check @draggable, Boolean
+    @contains ?= []
+    check @contains, [String]
+    check @template, Match.Optional String
+    check @summaryTemplate, Match.Optional String
 
   render: (component) ->
     new Blaze.Template =>
@@ -79,8 +84,8 @@ class ui.ComponentType
       else
         rules = component.game().rules
         Template["#{rules.replace /\s/g, ''}ComponentView"] ? Template.componentDefaultView
-      Blaze.With (type: @, component: component), ->
-        Blaze.With component, -> template
+      controller = new @controllerClass uiType: @, component: component
+      Blaze.With (controller: controller, component: component), -> template
 
   summary: (count, stack) ->
     if stack?
@@ -151,7 +156,52 @@ class ui.ComponentType
 
 
 class ui.Controller extends EventEmitter
-  # does nothing for now, but can be used for instanceof
+  handleDragLeave: (event) ->
+    if ((event.relatedTarget is null or
+        not event.currentTarget.contains event.relatedTarget) and
+        event.target is event.currentTarget)
+      $(event.currentTarget).removeClass 'drag-allowed'
+
+  # XXX not sure at all about this one
+  getContainer: (owner) ->
+    owner
+
+  # Override this to set other properties on move; but ideally don't, if
+  # possible, that should be done in the container class instead
+  doMoveComponent: (component, owner, oldContainer, count = 1) ->
+    if component instanceof CBGA.Component
+      if count is 1
+        component.moveTo @getContainer owner
+      else
+        type = @rules.getComponentType component.type
+        selector = type: component.type
+        if type.stackProperty?
+          selector[type.stackProperty] = component[type.stackProperty]
+        component.container().find selector, limit: count
+        .forEach (eachComponent) =>
+          eachComponent.moveTo @getContainer owner
+
+    else if component instanceof ui.ComponentStack
+      type = @rules.getComponentType component.type
+      selector = type: component.type
+      if type.stackProperty?
+        selector[type.stackProperty] = component[type.stackProperty]
+      component.container().find selector, limit: count
+      .forEach (eachComponent) =>
+        eachComponent.moveTo @getContainer owner
+
+    else if component.provider
+      # This can't be done on the client because typically a provider is private
+      # (deck of cards, for example)
+      # XXX missing stackProperty
+      target = @getContainer owner
+      options =
+        rules: @rules.name
+        type: component.type
+        source: component.container._id
+        target: target._id
+        count: count
+      Meteor.call 'component.draw', options
 
 
 class ui.PanelContainerController extends ui.Controller
@@ -185,8 +235,8 @@ class ui.PanelContainerController extends ui.Controller
     if @panel.contains.length
       new Blaze.Template =>
         owner ?= Template.currentData().owner
-        # XXX: Not sure why I used _.map instead of coffee's for.
-        # It does have the side effect of skipping undefineds (counters).
+        # Why _.map instead of coffee's for?
+        # Because then it has its own locals.
         _.map @panel.contains, (typeName) =>
           typeId = typeName.replace /\s/g, '-'
           type = @rules.getComponentType typeName
@@ -273,12 +323,6 @@ class ui.PanelContainerController extends ui.Controller
       event.preventDefault()
       true
 
-  handleDragLeave: (event) ->
-    if ((event.relatedTarget is null or
-        not event.currentTarget.contains event.relatedTarget) and
-        event.target is event.currentTarget)
-      $(event.currentTarget).removeClass 'drag-allowed'
-
   handleDrop: (event) ->
     $(event.currentTarget).removeClass 'drag-allowed'
     operation = ui.DragAndDropService.get event
@@ -287,43 +331,45 @@ class ui.PanelContainerController extends ui.Controller
     owner = @getOwner(event.currentTarget)
     @doMoveComponent operation.component, owner,
       operation.sourceController.getContainer operation.sourceOwner
+    true
 
-  # Override this to set other properties on move; but ideally don't, if
-  # possible, that should be done in the container class instead
-  doMoveComponent: (component, owner, oldContainer, count = 1) ->
-    if component instanceof CBGA.Component
-      if count is 1
-        component.moveTo @getContainer owner
-      else
-        type = @rules.getComponentType component.type
-        selector = type: component.type
-        if type.stackProperty?
-          selector[type.stackProperty] = component[type.stackProperty]
-        component.container().find selector, limit: count
-        .forEach (eachComponent) =>
-          eachComponent.moveTo @getContainer owner
 
-    else if component instanceof ui.ComponentStack
-      type = @rules.getComponentType component.type
-      selector = type: component.type
-      if type.stackProperty?
-        selector[type.stackProperty] = component[type.stackProperty]
-      component.container().find selector, limit: count
-      .forEach (eachComponent) =>
-        eachComponent.moveTo @getContainer owner
+# XXX there's an API mismatch since a PanelContainerController is bound to a
+# panel and shared between containers, while a ComponentController is bound to
+# a specific component. Have to evaluate if it's a problem.
+class ui.ComponentController extends ui.Controller
+  constructor: ({@uiType, @component} = {}) ->
+    @rules = CBGA.getGameRules @component.game().rules
 
-    else if component.provider
-      # This can't be done on the client because typically a provider is private
-      # (deck of cards, for example)
-      # XXX missing stackProperty
-      target = @getContainer owner
-      options =
-        rules: @rules.name
-        type: component.type
-        source: component.container._id
-        target: target._id
-        count: count
-      Meteor.call 'component.draw', options
+  # We'll probably need something like renderFull for recursive-ish components
+  # (e.g. cards that go on cards)
+  renderCounters: ->
+    new Blaze.Template =>
+      if @uiType.contains.length
+        _.map @uiType.contains, (typeName) =>
+          type = @rules.getComponentType typeName
+          if type.isCounter
+            type.renderCounter @component
+
+  handleDragOver: (event) ->
+    operation = ui.DragAndDropService.get event
+    return unless operation
+    return if operation.sourceOwner._id is @component._id and operation.sourceController is @
+    if operation.component.type in @uiType.contains
+      $(event.currentTarget).addClass 'drag-allowed'
+      event.preventDefault()
+      true
+
+  handleDrop: (event) ->
+    $(event.currentTarget).removeClass 'drag-allowed'
+    operation = ui.DragAndDropService.get event
+    return unless operation
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    console.log 'drop', operation
+    @doMoveComponent operation.component, @component,
+      operation.sourceController.getContainer operation.sourceOwner
+    true
 
 
 class ui.DragAndDropOperation
@@ -385,7 +431,7 @@ class DragAndDropService
 
   installHandlers: (template,
                     componentSelector = '.component[draggable], .provider[draggable]',
-                    panelSelector = '.game-panel') ->
+                    panelSelector = '.game-panel, .component.container') ->
     handlers = {}
 
     makeKey = (event, selector) ->
