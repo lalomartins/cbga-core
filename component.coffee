@@ -34,6 +34,7 @@ class CBGA.Component extends CBGA._DbModelBase
         container = container_
       else
         throw new Error "invalid container #{container}"
+    oldContainer = @container()
     properties._container = container._id
     properties._private ?= container._private
     container.acceptNewComponent?(@, properties)
@@ -47,6 +48,7 @@ class CBGA.Component extends CBGA._DbModelBase
       @emit 'changed', $set: properties
     else
       @emit 'changed', $set: properties, $unset: _player: true
+    oldContainer?.componentRemoved?(component)
 
 
 class CBGA.Container extends CBGA.Component

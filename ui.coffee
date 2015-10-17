@@ -291,13 +291,7 @@ class ui.PanelContainerController extends ui.Controller
   doMoveComponent: (component, owner, oldContainer, count = 1) ->
     if component instanceof CBGA.Component
       if count is 1
-        console.log 'move component'
         component.moveTo @getContainer owner
-        # This should probably be on Container, but it's a bit messy wrt container
-        # classes right now, and that's going to be refactored next thing, so for
-        # now here works
-        console.log 'component removed'
-        oldContainer?.componentRemoved?(component)
       else
         type = @rules.getComponentType component.type
         selector = type: component.type
