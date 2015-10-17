@@ -315,20 +315,13 @@ class ui.PanelContainerController extends ui.Controller
     else if component.provider
       # This can't be done on the client because typically a provider is private
       # (deck of cards, for example)
+      # XXX missing stackProperty
       target = @getContainer owner
       options =
         rules: @rules.name
         type: component.type
-        source:
-          type: component.container.ownerType
-          owner: component.container.owner
-          name: component.container.name
-          private: component.container.private
-        target:
-          type: target.type
-          owner: owner._id
-          name: target.name
-          private: target.private
+        source: component.container._id
+        target: target._id
         count: count
       Meteor.call 'component.draw', options
 

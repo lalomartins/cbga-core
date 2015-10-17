@@ -25,22 +25,20 @@ Meteor.methods
     game.start()
 
   'component.draw': (options) ->
-    # XXX should probably check that the current user is in the game
     unless Meteor.userId()
       throw new Metor.Error 'Not allowed', 'must be logged in'
     rules = CBGA.getGameRules options.rules
+    sourceContainer = rules.findComponent options.source
+    targetContainer = rules.findComponent options.target
+    unless sourceContainer._game is targetContainer._game
+      throw new Metor.Error 'Not allowed', 'must move to the same game'
+    player = CBGA.Players.findOne _user: Meteor.userId(), _game: sourceContainer._game
+    unless player?
+      throw new Metor.Error 'Not allowed', 'must be in the game'
     selector = type: options.type
     if options.stack?
       type = rules.getComponentType options.type
       selector[type.stackProperty] = options.stack
-    # XXX would be nice to pass the container class from the panel
-    sourceContainer = new CBGA.Container [options.source.type,
-      options.source.owner, options.source.name, options.source.private]
-    targetContainer = new CBGA.Container [options.target.type,
-      options.target.owner, options.target.name, options.target.private]
-    removed = []
     sourceContainer.find selector, limit: options.count, sort: position: 1
     .forEach (eachComponent) =>
       eachComponent.moveTo targetContainer
-      removed.push eachComponent
-    sourceContainer.componentsRemoved?(removed)
