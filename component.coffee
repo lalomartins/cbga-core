@@ -89,11 +89,11 @@ class CBGA.OrderedContainer extends CBGA.Container
   repack: (ids) ->
     unless ids?
       ids = _.pluck CBGA.Components.find(_container: @_id,
-        fields: _id: 1
+        fields: _id: 1, _class: 1
       ).fetch(), '_id'
     position = 0
     for id in ids
-      CBGA.Components.update id, $set: position: id
+      CBGA.Components.update id, $set: position: position
       position += 1
     position
 

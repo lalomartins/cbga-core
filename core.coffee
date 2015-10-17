@@ -70,15 +70,11 @@ CBGA.setupCollections = ->
             _.any fieldNames, (name) -> name is '_game' or name is '_user'
     CBGA.Components.deny
         update: (userId, doc, fieldNames, modifier) ->
-            debugger
             return true if _.any fieldNames, (name) -> name is '_game' or name is 'type'
             result = CBGA.utils.simulateMongoUpdate doc, modifier
-            return true unless result._container instanceof Array and \
-                result._container.length is 4 and \
-                typeof result._container[0] is 'string' and \
-                typeof result._container[1] is 'string' and \
-                typeof result._container[2] is 'string' and \
-                typeof result._container[3] is 'boolean'
+            return false unless result._container?
+            return true unless typeof result._container is 'string' and \
+                CBGA.Components.find(result._container).count() is 1
             false
     share.setupAllows()
 
@@ -87,6 +83,7 @@ CBGA.setupCollections = ->
 # Pattern: all your allows and deny functions should start with (CS/JS):
 #   return unless CBGA.getGameRules(doc) is MyRulesObject
 #   if(CBGA.getGameRules(doc) !== MyRulesObject) return;
+# and possibly in the case of components also checking _class if relevant.
 # Be VERY CAREFUL with allowing inserts! In most cases, they shouldn't be
 # allowed at all, and creating objects should be done by methods.
 allowsDone = []
@@ -104,4 +101,5 @@ share.setupAllows = ->
     for name, rules of share.gameRules
         setupClassAllows rules.gameClass, CBGA.Games
         setupClassAllows rules.playerClass, CBGA.Players
-        setupClassAllows rules.componentClass, CBGA.Components
+        for key, _class of rules.componentClasses
+            setupClassAllows _class, CBGA.Components
