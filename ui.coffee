@@ -122,7 +122,7 @@ class ui.ComponentType
         .forEach (doc) =>
           values[doc[@stackProperty]] = true
           return
-        for value, __ of values
+        for value of values
           selector = type: @name
           selector[@stackProperty] = value
           cursor = container.find selector
@@ -131,9 +131,11 @@ class ui.ComponentType
             Blaze.With (new ui.ComponentStack uiType: @, container: container, stack: value, count: count), =>
               @getCounterTemplate count, container.game().rules
           else
-            Blaze.With (uiType: @, stack: value, container: container), =>
-              Blaze.Each (-> cursor), =>
-                @getCounterTemplate count, container.game().rules
+            ((cursor) =>
+              Blaze.With (uiType: @, stack: value, container: container), =>
+                Blaze.Each (-> cursor), =>
+                  @getCounterTemplate count, container.game().rules
+            )(cursor)
     else
       new Blaze.Template =>
         container ?= Template.currentData()
@@ -145,7 +147,7 @@ class ui.ComponentType
         else
           Blaze.With (=> type: @, container: container), =>
             Blaze.Each (-> cursor), =>
-              @getCounterTemplate count, container.rules.name
+              @getCounterTemplate count, container.game().rules
 
 
 class ui.Controller extends EventEmitter
@@ -297,12 +299,18 @@ class ui.PanelContainerController extends ui.Controller
         selector = type: component.type
         if type.stackProperty?
           selector[type.stackProperty] = component[type.stackProperty]
-        removed = []
         component.container().find selector, limit: count
         .forEach (eachComponent) =>
           eachComponent.moveTo @getContainer owner
-          removed.push eachComponent
-        sourceContainer.componentsRemoved?(removed)
+
+    else if component instanceof ui.ComponentStack
+      type = @rules.getComponentType component.type
+      selector = type: component.type
+      if type.stackProperty?
+        selector[type.stackProperty] = component[type.stackProperty]
+      component.container().find selector, limit: count
+      .forEach (eachComponent) =>
+        eachComponent.moveTo @getContainer owner
 
     else if component.provider
       # This can't be done on the client because typically a provider is private

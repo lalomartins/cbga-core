@@ -48,7 +48,7 @@ class CBGA.Component extends CBGA._DbModelBase
       @emit 'changed', $set: properties
     else
       @emit 'changed', $set: properties, $unset: _player: true
-    oldContainer?.componentRemoved?(component)
+    oldContainer?.componentRemoved?(@)
 
 
 class CBGA.Container extends CBGA.Component
