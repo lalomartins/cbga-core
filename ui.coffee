@@ -157,14 +157,19 @@ class ui.ComponentType
 
 class ui.Controller extends EventEmitter
   handleDragLeave: (event) ->
-    if ((event.relatedTarget is null or
-        not event.currentTarget.contains event.relatedTarget) and
-        event.target is event.currentTarget)
-      $(event.currentTarget).removeClass 'drag-allowed'
+    $('.drag-allowed').removeClass 'drag-allowed'
 
   # XXX not sure at all about this one
   getContainer: (owner) ->
     owner
+
+  # This method sets alternate representations of the component, in case a
+  # player drags it somewhere else, such as a text editor or Facebook post
+  # composition area
+  setDataTransfer: (dataTransfer, element) ->
+    $e = $ element
+    dataTransfer.setData 'text/html', $e.html()
+    dataTransfer.setData 'text/plain', $e.text()
 
   # Override this to set other properties on move; but ideally don't, if
   # possible, that should be done in the container class instead
@@ -304,14 +309,6 @@ class ui.PanelContainerController extends ui.Controller
     else
       owner.getContainers([@panel.name])[0]
 
-  # This method sets alternate representations of the component, in case a
-  # player drags it somewhere else, such as a text editor or Facebook post
-  # composition area
-  setDataTransfer: (dataTransfer, element) ->
-    $e = $ element
-    dataTransfer.setData 'text/html', $e.html()
-    dataTransfer.setData 'text/plain', $e.text()
-
   handleDragOver: (event) ->
     operation = ui.DragAndDropService.get event
     return unless operation
@@ -354,14 +351,17 @@ class ui.ComponentController extends ui.Controller
   handleDragOver: (event) ->
     operation = ui.DragAndDropService.get event
     return unless operation
+    $('.drag-allowed').removeClass 'drag-allowed'
     return if operation.sourceOwner._id is @component._id and operation.sourceController is @
     return if operation.component._id is @component._id
     if operation.component.type in @uiType.contains
       $(event.currentTarget).addClass 'drag-allowed'
       event.preventDefault()
+      event.stopImmediatePropagation()
       true
 
   handleDrop: (event) ->
+    return unless $(event.currentTarget).hasClass 'drag-allowed'
     $(event.currentTarget).removeClass 'drag-allowed'
     operation = ui.DragAndDropService.get event
     return unless operation
@@ -382,9 +382,9 @@ class ui.DragAndDropOperation
           data.provider) \
           and not @component?
         @component = data
-      if data.controller? and data.owner? and not @sourceController?
+      if data.controller? and (data.owner? or data.component?) and not @sourceController?
         @sourceController = data.controller
-        @sourceOwner = data.owner
+        @sourceOwner = data.owner ? data.component
       break if @component? and @sourceController?
       view = view.parentView
     check @component, Match.OneOf CBGA.Component, ui.ComponentStack,
@@ -439,6 +439,7 @@ class DragAndDropService
 
     handlers[makeKey 'dragstart', componentSelector] = (event, ti) =>
       @start event
+      event.stopImmediatePropagation()
       true
 
     handlers[makeKey 'dragend', componentSelector] = (event, ti) =>
