@@ -355,6 +355,7 @@ class ui.ComponentController extends ui.Controller
     operation = ui.DragAndDropService.get event
     return unless operation
     return if operation.sourceOwner._id is @component._id and operation.sourceController is @
+    return if operation.component._id is @component._id
     if operation.component.type in @uiType.contains
       $(event.currentTarget).addClass 'drag-allowed'
       event.preventDefault()
@@ -366,7 +367,6 @@ class ui.ComponentController extends ui.Controller
     return unless operation
     event.preventDefault()
     event.stopImmediatePropagation()
-    console.log 'drop', operation
     @doMoveComponent operation.component, @component,
       operation.sourceController.getContainer operation.sourceOwner
     true
